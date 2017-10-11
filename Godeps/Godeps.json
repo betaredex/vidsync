@@ -1,0 +1,6 @@
+{
+	"ImportPath": "vidsync",
+	"GoVersion": "go1.9",
+	"GodepVersion": "v79",
+	"Deps": []
+}
