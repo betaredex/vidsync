@@ -16,7 +16,7 @@ const (
 
 var upgrader = websocket.Upgrader{
   ReadBufferSize: 1024,
-  WriteBufferSize: 1024
+  WriteBufferSize: 1024,
 }
 
 type Client struct {
@@ -36,58 +36,55 @@ func (c *Client) updateLatency(newLatency uint){
 func (c *Client) readPump() {
   var event Event
   defer func() {
-    c.hub.unregister <- c
+    c.hub.leave <- c
     c.conn.Close()
   }()
   c.conn.SetReadDeadline(time.Now().Add(pongWait))
-  c.conn.SetPongHandler(
-    func(string) error {
+  c.conn.SetPongHandler(func(string) error {
       c.conn.SetReadDeadline(time.Now().Add(pongWait)) // Deadline will be reached if peer stops replying
-      c.updateLatency((makeTimestamp-c.sentTime)/2)
+      c.updateLatency((makeTimestamp()-c.sentTime)/2)
       return nil
-    }
-  }
+  })
   for {
-    err := c.readJson(event)
+    err := c.conn.ReadJSON(event)
     if err != nil {
       fmt.Printf("error: %v\n", err)
       break
     }
     c.updateLatency(makeTimestamp() - event.timestamp)
-    c.hub.event <- *event
+    c.hub.event <- &event
   }
 }
 
 func (c *Client) writePump() {
-  var event Event
   ticker := time.NewTicker(pingPeriod)
   defer func() {
     ticker.Stop()
     c.conn.Close()
-    for {
-      select {
-      case event := *<-c.send:
-        c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-        w, err := c.conn.NextWriter(websocket.TextMessage)
-        if err != nil {
-          return
-        }
-        message, err := json.Marshal(event)
-        if err != nil {
-          fmt.Printf("error: %v\n", err)
-          return
-        }
-        w.Write(message)
-        if err := w.Close(); err != nil {
-          return
-        }
-      case <-ticker.C:
-        c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-        err := c.conn.WriteMessage(websocket.pingMessage, []byte{})
-        if err != nil {
-          fmt.Printf("error: %v\n", err)
-          return
-        }
+  }()
+  for {
+    select {
+    case event := <-c.send:
+      c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+      w, err := c.conn.NextWriter(websocket.TextMessage)
+      if err != nil {
+        return
+      }
+      message, err := json.Marshal(*event)
+      if err != nil {
+        fmt.Printf("error: %v\n", err)
+        return
+      }
+      w.Write(message)
+      if err := w.Close(); err != nil {
+        return
+      }
+    case <-ticker.C:
+      c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+      err := c.conn.WriteMessage(websocket.PingMessage, []byte{})
+      if err != nil {
+        fmt.Printf("error: %v\n", err)
+        return
       }
     }
   }
@@ -100,14 +97,14 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request){
     return
   }
   client := &Client {
-    hub: hub
-    conn: conn
-    send: make(chan *Event)
-    sentTime: 0
-    meanLatency: 0
-    connections: 0
+    hub: hub,
+    conn: conn,
+    send: make(chan *Event),
+    sentTime: 0,
+    meanLatency: 0,
+    connections: 0,
   }
-  hub.register <- client
+  hub.join <- client
 
   go client.writePump()
   go client.readPump()

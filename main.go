@@ -2,6 +2,7 @@ package main
 
 import (
   "net/http"
+  "time"
   "fmt"
   "io/ioutil"
   "os"
@@ -41,10 +42,11 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeTimestamp() uint {
-  return time.Now().UnixNano() / uint(time.Millisecond)
+  return uint(time.Now().UnixNano() / int64(time.Millisecond))
 }
 
 func main() {
+  hub := newHub()
   http.HandleFunc("/", requestHandler) // handler for all requests
   http.HandleFunc("websocket", func(w http.ResponseWriter, r *http.Request) {
     serveWs(hub, w, r)
