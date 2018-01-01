@@ -15,7 +15,7 @@ const (
 )
 
 var upgrader = websocket.Upgrader{
-  CheckOrigin: func(r *httpRequest) bool {return true}, // Allow requests from any origin
+  CheckOrigin: func(r *http.Request) bool {return true}, // Allow requests from any origin
 }
 
 type Client struct {
