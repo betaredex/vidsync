@@ -1,13 +1,13 @@
 package main
 
 type Hub struct {
-  clients map[*Client]bool
-  event chan *Event
-  join chan *Client
-  leave chan *Client
+  clients map[*Client]bool // clients currently attached to hub
+  event chan *Event // event queue
+  join chan *Client // join queue
+  leave chan *Client // leave queue
 }
 
-func newHub() *Hub {
+func newHub() *Hub { // basic constructor, nothing special here
   return &Hub {
     clients: make(map[*Client]bool),
     event: make(chan *Event),
@@ -19,16 +19,16 @@ func newHub() *Hub {
 func (h *Hub) run() {
   for {
     select {
-    case client := <-h.join:
+    case client := <-h.join: // add joining clients to the hub
       h.clients[client] = true
-    case client := <-h.leave:
+    case client := <-h.leave: // remove leaving clients from the hub
       if _, ok := h.clients[client]; ok {
         delete(h.clients, client)
       }
-      close(client.send)
+      close(client.send) // close connection
     case event := <-h.event:
       var max uint = 0
-      for client := range h.clients {
+      for client := range h.clients { // find the client with the maximum latency and
         if client.meanLatency > max {
           max = client.meanLatency
         }

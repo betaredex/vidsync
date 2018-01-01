@@ -47,9 +47,10 @@ func makeTimestamp() uint {
 
 func main() {
   hub := newHub()
-  http.HandleFunc("/", requestHandler) // handler for all requests
-  http.HandleFunc("websocket", func(w http.ResponseWriter, r *http.Request) {
+  http.HandleFunc("/websocket", func(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("websocket request")
     serveWs(hub, w, r)
   })
+  http.HandleFunc("/", requestHandler) // handler for all requests
   http.ListenAndServe(":8080", nil) // default port
 }

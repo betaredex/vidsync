@@ -15,17 +15,16 @@ const (
 )
 
 var upgrader = websocket.Upgrader{
-  ReadBufferSize: 1024,
-  WriteBufferSize: 1024,
+  CheckOrigin: func(r *httpRequest) bool {return true}, // Allow requests from any origin
 }
 
 type Client struct {
-  hub *Hub
-  conn *websocket.Conn
-  send chan *Event
-  sentTime uint
-  meanLatency uint
-  connections uint
+  hub *Hub // The hub this client is connected to
+  conn *websocket.Conn // The connection from the client object to the peer
+  send chan *Event // events to send to the peer
+  sentTime uint // the last time we pinged the peer
+  meanLatency uint // average latency of the peer
+  connections uint // number of times the peer connected to the client
 }
 
 func (c *Client) updateLatency(newLatency uint){
@@ -35,68 +34,69 @@ func (c *Client) updateLatency(newLatency uint){
 
 func (c *Client) readPump() {
   var event Event
-  defer func() {
+  defer func() { // leave the hub when the function breaks
     c.hub.leave <- c
     c.conn.Close()
   }()
   c.conn.SetReadDeadline(time.Now().Add(pongWait))
   c.conn.SetPongHandler(func(string) error {
       c.conn.SetReadDeadline(time.Now().Add(pongWait)) // Deadline will be reached if peer stops replying
-      c.updateLatency((makeTimestamp()-c.sentTime)/2)
+      c.updateLatency((makeTimestamp()-c.sentTime)/2) // updates the latency based on the ping
       return nil
   })
   for {
-    err := c.conn.ReadJSON(event)
+    err := c.conn.ReadJSON(event) // stores the json from the connection in 'event', after decoding it. see event.go for details
     if err != nil {
       fmt.Printf("error: %v\n", err)
       break
     }
-    c.updateLatency(makeTimestamp() - event.timestamp)
-    c.hub.event <- &event
+    c.updateLatency(makeTimestamp() - event.timestamp) // new latency measurement by comparing the timestamp of the event's creation with the current time
+    c.hub.event <- &event // send the event to the hub
   }
 }
 
 func (c *Client) writePump() {
-  ticker := time.NewTicker(pingPeriod)
-  defer func() {
+  ticker := time.NewTicker(pingPeriod) // timer to ping the peer once every pingPeriod
+  defer func() { // cleanup when the fuction breaks
     ticker.Stop()
     c.conn.Close()
   }()
   for {
     select {
-    case event := <-c.send:
+    case event := <-c.send: // new event from hub
       c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-      w, err := c.conn.NextWriter(websocket.TextMessage)
+      w, err := c.conn.NextWriter(websocket.TextMessage) // get a writer
       if err != nil {
         return
       }
-      message, err := json.Marshal(*event)
+      message, err := json.Marshal(*event) // convert the event to JSON
       if err != nil {
         fmt.Printf("error: %v\n", err)
         return
       }
-      w.Write(message)
+      w.Write(message) // send the event to the peer
       if err := w.Close(); err != nil {
         return
       }
-    case <-ticker.C:
+    case <-ticker.C: // timer is up
       c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-      err := c.conn.WriteMessage(websocket.PingMessage, []byte{})
+      err := c.conn.WriteMessage(websocket.PingMessage, []byte{}) // ping the peer
       if err != nil {
         fmt.Printf("error: %v\n", err)
         return
       }
+      c.sentTime = makeTimestamp() // record when the ping was sent
     }
   }
 }
 
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request){
-  conn, err := upgrader.Upgrade(w, r, nil)
+func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request){ // serves the websocket to the peer
+  conn, err := upgrader.Upgrade(w, r, nil) // upgrades the connection from http
   if err != nil {
     fmt.Printf("error: %v\n", err)
     return
   }
-  client := &Client {
+  client := &Client { // initialize the client
     hub: hub,
     conn: conn,
     send: make(chan *Event),
@@ -104,8 +104,8 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request){
     meanLatency: 0,
     connections: 0,
   }
-  hub.join <- client
+  hub.join <- client // add the client to the hub
 
-  go client.writePump()
+  go client.writePump() // start our pump functions
   go client.readPump()
 }

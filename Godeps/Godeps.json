@@ -2,5 +2,11 @@
 	"ImportPath": "vidsync",
 	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
-	"Deps": []
+	"Deps": [
+		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Comment": "v1.2.0-11-gf918560",
+			"Rev": "f918560c4c3d6a271185320bb1d4a1e40f77297f"
+		}
+	]
 }
