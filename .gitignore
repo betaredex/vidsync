@@ -14,3 +14,7 @@
 .glide/
 
 vendor/
+
+client/node_modules/
+
+vidsync

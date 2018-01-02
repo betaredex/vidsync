@@ -1,4 +1,6 @@
-var ws = new WebSocket("ws://localhost:8080/websocket"); // temporary
+const WebSocket = require("ws")
+
+var ws = new WebSocket("ws://localhost:9999/websocket"); // temporary
 
 var keybinds = {
   modkey: "TAB",
@@ -10,8 +12,7 @@ var keybinds = {
   seek_d: modkey+"+DOWN"
 }
 
-
-ws.onmessage = function(event){
+ws.on("message", function(event){
   var cmd = event.method.split(' ');
   switch(cmd[0]){
     case "pause":
@@ -20,7 +21,7 @@ ws.onmessage = function(event){
       }, event.schedule-Date.now
       );
     
-    case "play"
+    case "play":
       setTimeout(function(){
         mp.set_property_bool("pause", false);
       }, event.schedule-Date.now
@@ -31,44 +32,44 @@ ws.onmessage = function(event){
       }, event.schedule-Date.now
       );
   }
-}
+});
       
 function pause_handler(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: mp.getProperty("pause") ? "play" : "pause"
-  });
+  }));
 }
 function sync_handler(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: "seek " + mp.getProperty("time-pos")
-  });
+  }));
 }
 
 function seek_handler_r(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: "seek " + (mp.getProperty("time-pos") + 5)
-  });
+  }));
 }
 function seek_handler_l(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: "seek " + (mp.getProperty("time-pos") - 5)
-  });
+  }));
 }
 function seek_handler_u(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: "seek " + (mp.getProperty("time-pos") + 60)
-  });
+  }));
 }
 function seek_handler_d(){
   ws.send(JSON.stringify({
     timestamp: Math.floor(Date.now),
     method: "seek " + (mp.getProperty("time-pos") - 60)
-  });
+  }));
 }
 
 mp.add_key_binding(keybinds.pause, pause_handler);

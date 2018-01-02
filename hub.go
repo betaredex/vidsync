@@ -28,7 +28,7 @@ func (h *Hub) run() {
       close(client.send) // close connection
     case event := <-h.event:
       var max uint = 0
-      for client := range h.clients { // find the client with the maximum latency and
+      for client := range h.clients { // find the client with the maximum latency and use that for scheduling
         if client.meanLatency > max {
           max = client.meanLatency
         }
@@ -38,10 +38,9 @@ func (h *Hub) run() {
         schedule: makeTimestamp() + max,
         method: event.method,
       }
-      for client := range h.clients {
+      for client := range h.clients { // send the event to all the clients
         client.send <- sync
       }
     }
   }
 }
-
